@@ -1,5 +1,7 @@
 .git
 *.zip
+*.db
 *.db.tmp
+*.exe
 Dockerfile
 .dockerignore
