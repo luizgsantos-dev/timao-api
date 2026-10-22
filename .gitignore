@@ -1,0 +1,9 @@
+# Banco gerado pela importação (go run ./cmd/importar, ou a própria API)
+*.db
+*.db.tmp
+
+# Executáveis
+*.exe
+/timao-api
+/api
+/importar

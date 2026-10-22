@@ -1,0 +1,51 @@
+[
+  {
+    "data": "2026-10-25",
+    "horario": "16:00",
+    "adversario": "Adversário Exemplo A",
+    "competicao": "Campeonato Brasileiro",
+    "mando": "casa",
+    "local": "Neo Química Arena"
+  },
+  {
+    "data": "2026-11-02",
+    "horario": "19:00",
+    "adversario": "Adversário Exemplo B",
+    "competicao": "Copa do Brasil",
+    "mando": "fora"
+  },
+  {
+    "data": "2026-11-15",
+    "horario": "18:30",
+    "adversario": "Adversário Exemplo C",
+    "competicao": "Campeonato Brasileiro",
+    "mando": "casa",
+    "local": "Neo Química Arena"
+  },
+  {
+    "data": "2026-10-31",
+    "horario": "15:00",
+    "adversario": "Adversária Exemplo F1",
+    "competicao": "Campeonato Brasileiro Feminino",
+    "mando": "casa",
+    "categoria": "feminino",
+    "local": "Parque São Jorge"
+  },
+  {
+    "data": "2026-11-08",
+    "horario": "11:00",
+    "adversario": "Adversária Exemplo F2",
+    "competicao": "Campeonato Brasileiro Feminino",
+    "mando": "fora",
+    "categoria": "feminino"
+  },
+  {
+    "data": "2026-11-21",
+    "horario": "16:00",
+    "adversario": "Adversária Exemplo F3",
+    "competicao": "Copa do Brasil Feminina",
+    "mando": "casa",
+    "categoria": "feminino",
+    "local": "Neo Química Arena"
+  }
+]
