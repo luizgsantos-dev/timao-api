@@ -247,18 +247,28 @@ func gravarPassagensDerivadas(ctx context.Context, esc *banco.Escritor, reg *reg
 	return len(ordem), nil
 }
 
-// importarCompeticoesFemininas completa as partidas das Brabas com as páginas de
-// edição das competições (Libertadores, Brasileirão, Paulista...).
-func importarCompeticoesFemininas(ctx context.Context, log *slog.Logger, esc *banco.Escritor, wp *wikipedia.Wikipedia, detalhes bool) error {
-	log.Info("lendo as páginas das competições femininas na Wikipédia")
+// importarCompeticoes completa as partidas com as páginas de edição das
+// competições (Libertadores, Brasileirão, Paulista...), nas duas categorias e nas
+// Wikipédias em inglês e em português, só para os anos sem página de temporada.
+func importarCompeticoes(ctx context.Context, log *slog.Logger, esc *banco.Escritor, wp *wikipedia.Wikipedia,
+	temporadas []paginaGravada, detalhes bool) error {
+	log.Info("lendo as páginas de edição das competições na Wikipédia")
 	agora := time.Now()
-	paginas, err := wp.CompeticoesFemininas(ctx)
+	cobertos := map[string]map[int]bool{banco.Masculino: {}, banco.Feminino: {}}
+	for _, pg := range temporadas {
+		cobertos[pg.Categoria][pg.Temporada] = true
+	}
+	paginas, err := wp.Competicoes(ctx, cobertos)
 	if err != nil {
 		return err
 	}
 	var total uniao
 	for _, pg := range paginas {
-		fonteID, err := esc.Fonte(ctx, banco.Fonte{Nome: "Wikipédia (en): " + pg.Titulo, URL: pg.URL, Licenca: wikipedia.Licenca, ColetadoEm: agora})
+		lingua := pg.Lingua
+		if lingua == "" {
+			lingua = "en"
+		}
+		fonteID, err := esc.Fonte(ctx, banco.Fonte{Nome: "Wikipédia (" + lingua + "): " + pg.Titulo, URL: pg.URL, Licenca: wikipedia.Licenca, ColetadoEm: agora})
 		if err != nil {
 			return err
 		}
@@ -273,6 +283,6 @@ func importarCompeticoesFemininas(ctx context.Context, log *slog.Logger, esc *ba
 			}
 		}
 	}
-	total.registrar(log, "competições femininas", detalhes)
+	total.registrar(log, "páginas de competição", detalhes)
 	return nil
 }

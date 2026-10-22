@@ -120,3 +120,49 @@ func TestMesmoAdversario(t *testing.T) {
 		}
 	}
 }
+
+func TestEnriquecer(t *testing.T) {
+	ctx := context.Background()
+	esc, err := Criar(ctx, filepath.Join(t.TempDir(), "timao.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer esc.Descartar()
+	fonte, _ := esc.Fonte(ctx, Fonte{Nome: "t", URL: "u", Licenca: "l", ColetadoEm: time.Now()})
+	n := func(v int) *int { return &v }
+	if _, err := esc.Partida(ctx, Partida{Categoria: Masculino, Temporada: 2005, Data: "2005-05-01", Adversario: "Santos",
+		Mando: "casa", GolsPro: n(2), GolsContra: n(1), Estadio: "Pacaembu"}, fonte); err != nil {
+		t.Fatal(err)
+	}
+	vs, _ := esc.PartidasPerto(ctx, Masculino, "2005-05-01", 0)
+	id := vs[0].ID
+
+	comGols := Partida{GolsPro: n(2), GolsContra: n(1), Estadio: "Outro", Arbitro: "Fulano", Gols: []Gol{
+		{Lado: "pro", Autor: "Tevez", Minuto: "10", Tipo: "normal"},
+		{Lado: "pro", Autor: "Nilmar", Minuto: "50", Tipo: "normal"},
+		{Lado: "contra", Autor: "Robinho", Minuto: "80", Tipo: "penalti"},
+	}}
+	if mudou, err := esc.Enriquecer(ctx, id, comGols); err != nil || !mudou {
+		t.Fatalf("primeira vez deveria mudar: %v %v", mudou, err)
+	}
+	if mudou, err := esc.Enriquecer(ctx, id, comGols); err != nil || mudou {
+		t.Fatalf("segunda vez não deveria mudar nada (gols e árbitro já existem): %v %v", mudou, err)
+	}
+	var estadio, arbitro string
+	var gols int
+	_ = esc.tx.QueryRowContext(ctx, `SELECT estadio, arbitro, (SELECT COUNT(*) FROM gol) FROM partida WHERE id = ?`, id).Scan(&estadio, &arbitro, &gols)
+	if estadio != "Pacaembu" || arbitro != "Fulano" || gols != 3 {
+		t.Fatalf("não sobrescreve o estádio, preenche o árbitro e grava 3 gols: %q %q %d", estadio, arbitro, gols)
+	}
+
+	// Gols que não somam o placar não entram.
+	if _, err := esc.Partida(ctx, Partida{Categoria: Masculino, Temporada: 2005, Data: "2005-06-01", Adversario: "Palmeiras",
+		Mando: "fora", GolsPro: n(1), GolsContra: n(0)}, fonte); err != nil {
+		t.Fatal(err)
+	}
+	vs, _ = esc.PartidasPerto(ctx, Masculino, "2005-06-01", 0)
+	incompleto := Partida{GolsPro: n(1), GolsContra: n(0), Gols: []Gol{}}
+	if mudou, _ := esc.Enriquecer(ctx, vs[0].ID, incompleto); mudou {
+		t.Fatal("sem gols nem campos novos, não deveria mudar")
+	}
+}

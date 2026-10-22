@@ -180,3 +180,49 @@ func placarIgual(t *testing.T, p banco.Partida, pro, contra int) {
 		t.Errorf("placar %s: veio %v x %v, esperava %d x %d", p.Data, p.GolsPro, p.GolsContra, pro, contra)
 	}
 }
+
+// Caixa da Wikipédia em português, no formato das páginas de Copa do Brasil e Paulista.
+const caixaPT = `== Final ==
+{{footballbox
+|data=[[17 de junho]]
+|hora   =21:50
+|time1  ={{Futebol Corinthians|estado=depois}}
+|placar =2 – 0
+|time2  ={{Futebol Internacional-RS|estado=antes}}
+|gols1  =[[Jorge Henrique de Souza|Jorge Henrique]] {{gol|26}}<br />[[Ronaldo Luís Nazário de Lima|Ronaldo]] {{gol|53}}
+|gols2  =
+|estadio=[[Estádio Municipal Paulo Machado de Carvalho|Estádio do Pacaembu]], [[São Paulo]]
+|publico=36.614
+|arbitro={{Arbitro|BR-PR|PR|[[Heber Roberto Lopes]]}}
+}}
+{{footballbox
+|data = 1º de julho de 2009
+|time1 = {{Futebol Internacional-RS|estado=depois}}
+|placar = 2 — 2
+|time2 = {{Futebol Corinthians|estado=antes}}
+|gols1 = [[Alecsandro]] {{gol|69}}, {{gol|74}}
+|gols2 = [[Jorge Henrique de Souza|Jorge Henrique]] {{gol|29}}
+}}`
+
+func TestCaixaEmPortugues(t *testing.T) {
+	ps, avisos := ExtrairPartidasDaCompeticao(caixaPT, banco.Masculino, 2009, "Copa do Brasil")
+	if len(ps) != 2 {
+		t.Fatalf("esperava 2 jogos, vieram %d (avisos: %v)", len(ps), avisos)
+	}
+	p := ps[0]
+	confere(t, "data sem ano", p.Data, "2009-06-17")
+	confere(t, "adversário da predefinição Futebol", p.Adversario, "Internacional-RS")
+	confere(t, "mando", p.Mando, "casa")
+	confere(t, "árbitro", p.Arbitro, "Heber Roberto Lopes")
+	confere(t, "fase", p.Fase, "Final")
+	placarIgual(t, p, 2, 0)
+	if p.Publico == nil || *p.Publico != 36614 || len(p.Gols) != 2 || p.Gols[1].Autor != "Ronaldo" || p.Gols[1].Minuto != "53" {
+		t.Errorf("público e gols: %v %+v", p.Publico, p.Gols)
+	}
+	p = ps[1]
+	confere(t, "data com 1º", p.Data, "2009-07-01")
+	placarIgual(t, p, 2, 2)
+	if len(p.Gols) != 3 {
+		t.Errorf("dois gols do Alecsandro na mesma linha e um do Corinthians: %+v", p.Gols)
+	}
+}

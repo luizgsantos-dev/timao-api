@@ -132,3 +132,98 @@ func TestMembrosDaCategoria(t *testing.T) {
 		t.Fatalf("membros com continuação: %v %v (%d chamadas)", membros, err, chamadas)
 	}
 }
+
+func TestElencoEmSubsecao(t *testing.T) {
+	// Formato das páginas do masculino de 2015–2019: "===Squad===" dentro de "==Background==",
+	// e uma "==Squad statistics==" de nível 2 que não é o elenco.
+	texto := `==Background==
+===Kit===
+Texto.
+===Squad===
+As of 15 September 2015
+{{Fs start}}
+{{Fs player|no=1|nat=BRA|pos=GK|name=[[Cássio Ramos|Cássio]]}}
+{{Fs player|no=9|nat=BRA|pos=FW|name=[[Vágner Love]]|other=on loan from [[Monaco]]}}
+{{Fs end}}
+==Squad statistics==
+{| class="wikitable"
+|}
+==Players==
+===First team squad===
+{{fs player|no=99|nat=BRA|pos=MF|name=[[Outra Seção]]}}
+`
+	el := ExtrairElenco(texto, banco.Masculino)
+	if len(el) != 2 || el[0].Nome != "Cássio" || el[1].WikiEN != "Vágner Love" {
+		t.Fatalf("elenco da subseção ===Squad===: %+v", el)
+	}
+
+	// Formato de 2013: "===First team squad===" dentro de "==Players==", com emprestados à parte.
+	texto = `==Players==
+===First team squad===
+{{fs start}}
+{{Fs player |no=1  |nat=BRA |pos=GK |name=[[Júlio César de Souza Santos|Júlio César]]}}
+{{fs end}}
+===Out on Loan===
+{{Fs player|no=30|nat=BRA|pos=DF|name=[[Emprestado]]}}
+`
+	el = ExtrairElenco(texto, banco.Masculino)
+	if len(el) != 1 || el[0].Nome != "Júlio César" || *el[0].Numero != 1 {
+		t.Fatalf("elenco de First team squad: %+v", el)
+	}
+}
+
+const estatisticasTeste = `===Statistics===
+{| class="wikitable"
+|-
+! rowspan="2"|No.
+! rowspan="2"|Pos.
+! rowspan="2"|Name
+! colspan="2"|[[2008 Campeonato Brasileiro Série B|Brasileiro Série B]]
+! colspan="2"|Copa do Brasil
+! colspan="2"|Total
+! colspan="2"|Discipline
+|-
+!Apps
+!Goals
+!Apps
+!Goals
+!Apps
+!Goals
+![[File:Yellow card.svg|13px]]
+![[File:Red card.svg|13px]]
+|-
+|align="left"|1||align="left"|GK||align="left"|{{Flag icon|BRA}} [[Luiz Felipe Ventura dos Santos|Felipe]]
+|27||-17||11||-12||38||-29||1||0
+|-
+|align="left"|2||align="left"|DF||align="left"|{{flagicon|PER}} [[Edu Dracena]]
+|9 (2)||1||1 (3)||0||10 (5)||1||3||0
+|}
+`
+
+func TestExtrairEstatisticas(t *testing.T) {
+	es := ExtrairEstatisticas(estatisticasTeste, banco.Masculino)
+	if len(es) != 2 {
+		t.Fatalf("esperava 2 jogadores, vieram %+v", es)
+	}
+	goleiro := es[0]
+	if goleiro.Nome != "Felipe" || goleiro.WikiEN != "Luiz Felipe Ventura dos Santos" || *goleiro.Jogos != 38 || goleiro.Gols != nil ||
+		goleiro.Posicao != "goleiro" || goleiro.Nacionalidade != "BRA" || *goleiro.Numero != 1 {
+		t.Errorf("goleiro (gols sofridos negativos ficam nulos): %+v", goleiro)
+	}
+	if e := es[1]; *e.Jogos != 15 || *e.Gols != 1 || e.Nacionalidade != "PER" {
+		t.Errorf("titular e reserva somados pelo Total: %+v jogos=%v", e, *e.Jogos)
+	}
+}
+
+func TestMesclarElenco(t *testing.T) {
+	n := func(v int) *int { return &v }
+	elenco := []banco.Elenco{{Nome: "Felipe", WikiEN: "Luiz Felipe Ventura dos Santos", Numero: n(1)}}
+	est := []banco.Elenco{
+		{Nome: "Felipe", WikiEN: "Luiz Felipe Ventura dos Santos", Jogos: n(38), Nacionalidade: "BRA"},
+		{Nome: "Saiu no Meio", Jogos: n(3)},
+	}
+	m := MesclarElenco(elenco, est)
+	if len(m) != 2 || *m[0].Jogos != 38 || m[0].Nacionalidade != "BRA" || *m[0].Numero != 1 || m[1].Nome != "Saiu no Meio" {
+		t.Fatalf("mescla: %+v", m)
+	}
+}

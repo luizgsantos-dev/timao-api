@@ -84,3 +84,22 @@ func TestExtrairTitulosSemSecao(t *testing.T) {
 		t.Fatalf("sem Honours: %v %v", ts, avisos)
 	}
 }
+
+func TestCampeaoCorinthians(t *testing.T) {
+	casos := []struct {
+		nome, texto string
+		want        bool
+	}{
+		{"en, champion_other", "{{Infobox international football competition\n| champion_other = {{flagicon|BRA}} [[Sport Club Corinthians Paulista (women)|Corinthians]]\n| count = 6\n}}", true},
+		{"en, winners", "{{Infobox football league season\n| winners = [[Sport Club Corinthians Paulista|Corinthians]] {{small|(7th title)}}\n}}", true},
+		{"pt, predefinição de time", "{{Info/Campeonato de futebol\n| campeão = {{Futebol Corinthians Feminino}} {{Small|(6.º título)}}\n}}", true},
+		{"pt, outro campeão", "{{Info/Campeonato de futebol\n|campeão=[[Sociedade Esportiva Palmeiras (futebol feminino)|Palmeiras]]\n|vice-campeão=[[Sport Club Corinthians Paulista (futebol feminino)|Corinthians]]\n}}", false},
+		{"jogo único, sem campo de campeão", "{{Info/Partida de futebol\n|time1=Palmeiras\n|time2=Corinthians\n}}", false},
+		{"sem quadro", "texto", false},
+	}
+	for _, c := range casos {
+		if got := CampeaoCorinthians(c.texto); got != c.want {
+			t.Errorf("%s: %v, esperava %v", c.nome, got, c.want)
+		}
+	}
+}

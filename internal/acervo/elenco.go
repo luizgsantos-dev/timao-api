@@ -11,6 +11,8 @@ type Integrante struct {
 	Numero        *int   `json:"numero,omitempty"`
 	Posicao       string `json:"posicao,omitempty"`
 	Nacionalidade string `json:"nacionalidade,omitempty"` // código FIFA, ex.: BRA
+	Jogos         *int   `json:"jogos,omitempty"`         // na temporada, quando a fonte tem estatísticas
+	Gols          *int   `json:"gols,omitempty"`
 }
 
 type Elenco struct {
@@ -25,6 +27,8 @@ type ElencoDaPessoa struct {
 	Temporada int    `json:"temporada"`
 	Numero    *int   `json:"numero,omitempty"`
 	Posicao   string `json:"posicao,omitempty"`
+	Jogos     *int   `json:"jogos,omitempty"`
+	Gols      *int   `json:"gols,omitempty"`
 }
 
 // Elenco devolve o elenco da categoria numa temporada, ordenado pelo número da
@@ -52,7 +56,7 @@ func (a *Acervo) Elenco(ctx context.Context, categoria string, temporada int) (E
 	}
 	out.Temporada = temporada
 
-	rows, err = a.conn().QueryContext(ctx, `SELECT e.nome, pe.wikidata, e.numero, e.posicao, e.nacionalidade, f.nome, f.url, f.licenca
+	rows, err = a.conn().QueryContext(ctx, `SELECT e.nome, pe.wikidata, e.numero, e.posicao, e.nacionalidade, e.jogos, e.gols, f.nome, f.url, f.licenca
 		FROM elenco e JOIN fonte f ON f.id = e.fonte_id LEFT JOIN pessoa pe ON pe.id = e.pessoa_id
 		WHERE e.categoria = ? AND e.temporada = ?
 		ORDER BY e.numero IS NULL, e.numero, e.nome`, categoria, temporada)
@@ -63,12 +67,13 @@ func (a *Acervo) Elenco(ctx context.Context, categoria string, temporada int) (E
 	for rows.Next() {
 		var i Integrante
 		var wd, pos, nac sql.NullString
-		var num sql.NullInt64
+		var num, jogos, gols sql.NullInt64
 		var f Fonte
-		if err := rows.Scan(&i.Nome, &wd, &num, &pos, &nac, &f.Nome, &f.URL, &f.Licenca); err != nil {
+		if err := rows.Scan(&i.Nome, &wd, &num, &pos, &nac, &jogos, &gols, &f.Nome, &f.URL, &f.Licenca); err != nil {
 			return out, erroConsulta("lendo integrante", err)
 		}
 		i.Wikidata, i.Numero, i.Posicao, i.Nacionalidade = wd.String, inteiro(num), pos.String, nac.String
+		i.Jogos, i.Gols = inteiro(jogos), inteiro(gols)
 		out.Elenco = append(out.Elenco, i)
 		out.Fonte = &f
 	}
@@ -83,7 +88,7 @@ func (a *Acervo) Elenco(ctx context.Context, categoria string, temporada int) (E
 
 // elencosDaPessoa lista as temporadas em que a pessoa esteve no elenco da categoria.
 func (a *Acervo) elencosDaPessoa(ctx context.Context, categoria string, pessoaID int64) ([]ElencoDaPessoa, error) {
-	rows, err := a.conn().QueryContext(ctx, `SELECT temporada, numero, posicao FROM elenco
+	rows, err := a.conn().QueryContext(ctx, `SELECT temporada, numero, posicao, jogos, gols FROM elenco
 		WHERE categoria = ? AND pessoa_id = ? ORDER BY temporada`, categoria, pessoaID)
 	if err != nil {
 		return nil, erroConsulta("listando elencos da pessoa", err)
@@ -92,12 +97,12 @@ func (a *Acervo) elencosDaPessoa(ctx context.Context, categoria string, pessoaID
 	var out []ElencoDaPessoa
 	for rows.Next() {
 		var e ElencoDaPessoa
-		var num sql.NullInt64
+		var num, jogos, gols sql.NullInt64
 		var pos sql.NullString
-		if err := rows.Scan(&e.Temporada, &num, &pos); err != nil {
+		if err := rows.Scan(&e.Temporada, &num, &pos, &jogos, &gols); err != nil {
 			return nil, erroConsulta("lendo elenco da pessoa", err)
 		}
-		e.Numero, e.Posicao = inteiro(num), pos.String
+		e.Numero, e.Posicao, e.Jogos, e.Gols = inteiro(num), pos.String, inteiro(jogos), inteiro(gols)
 		out = append(out, e)
 	}
 	return out, rows.Err()

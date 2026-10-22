@@ -44,6 +44,15 @@ Levantamento feito em 22/10/2026, consultando cada fonte diretamente. Os número
 - **Páginas em português** das competições femininas não usam caixas de jogo legíveis, e a tabela "List of SC Corinthians Paulista (women) seasons" só tem o resumo de cada temporada.
 - **Limite de requisições:** a Wikipédia responde 429 quando muitas páginas são pedidas em sequência. O importador espera entre páginas e repete quando recebe 429.
 
+## Atualização: segunda rodada (22/10/2026)
+
+- **RSSSF e RSSSF Brasil:** termos "You are free to copy this document in whole or part provided that proper acknowledgement is given to the author", com "All rights reserved". Usado com crédito ao autor de cada página (repositório privado); antes de abrir a API ao público, vale pedir autorização ao RSSSF. Rendeu cerca de 2.600 partidas do masculino de 1913 a 2014, com gols onde a página traz.
+- **Páginas de edição na Wikipédia:** as subpáginas da Libertadores em inglês ("2010 Copa Libertadores second stage") têm caixas de jogo completas; as páginas em português do Paulista e da Copa do Brasil trazem o mata-mata em {{footballbox}} com campos em português. Rendeu cerca de 170 partidas nas duas categorias.
+- **Elencos do masculino:** as páginas de 2013 e 2015–2019 usam {{Fs player}} numa subseção ("===Squad===" dentro de "Background"); 2008 e 2015–2019 têm a tabela "Squad statistics" com jogos e gols por jogador.
+- **Títulos recentes:** o quadro de informações das páginas de edição traz o campeão (campos champion, champion_other, winners ou campeão). O Wikidata (P1346) está quase vazio nas edições recentes.
+- **Correção:** o Paulista Feminino de 2025 foi do Palmeiras (5 x 2 no agregado); o Corinthians venceu só a volta.
+- **Sem saída aberta:** CBF (termos proíbem reprodução), Federação Paulista (bloqueia acesso automático), elencos e técnicos das Brabas antes de 2018.
+
 ## Descartadas
 
 - **ogol, Transfermarkt, Sofascore, site oficial:** os termos de uso proíbem coleta automática.

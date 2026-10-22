@@ -195,7 +195,7 @@ func TestElenco(t *testing.T) {
 	if e.Temporada != 2025 || len(e.Temporadas) != 2 || len(e.Elenco) != 2 {
 		t.Fatalf("elenco mais recente: %+v", e)
 	}
-	if i := e.Elenco[0]; i.Nome != "Tamires" || i.Wikidata != "Q2" || *i.Numero != 37 {
+	if i := e.Elenco[0]; i.Nome != "Tamires" || i.Wikidata != "Q2" || *i.Numero != 37 || *i.Jogos != 30 || *i.Gols != 4 {
 		t.Errorf("com número primeiro e ligada à pessoa: %+v", i)
 	}
 	if i := e.Elenco[1]; i.Wikidata != "" || i.Numero != nil {

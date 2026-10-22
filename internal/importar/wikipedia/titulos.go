@@ -306,3 +306,103 @@ func nomeESlug(comp string) (string, string) {
 	}
 	return comp, strings.Trim(reNaoAlfanum.ReplaceAllString(banco.Normalizar(comp), "-"), "-")
 }
+
+// Edições cujo quadro de informações traz o campeão. Servem para achar títulos
+// recentes antes de a tabela "Honours" ser atualizada.
+var edicoesComCampeao = []struct {
+	categoria, lingua, formato, competicao, slug, escopo string
+}{
+	{banco.Masculino, "en", "%d Copa Libertadores", "Copa Libertadores", "libertadores", "continental"},
+	{banco.Masculino, "en", "%d Copa Sudamericana", "Copa Sul-Americana", "sul-americana", "continental"},
+	{banco.Masculino, "en", "%d Recopa Sudamericana", "Recopa Sul-Americana", "recopa-sul-americana", "continental"},
+	{banco.Masculino, "en", "%d FIFA Club World Cup", "Mundial de Clubes da FIFA", "mundial-de-clubes", "mundial"},
+	{banco.Masculino, "en", "%d Campeonato Brasileiro Série A", "Campeonato Brasileiro", "brasileirao", "nacional"},
+	{banco.Masculino, "en", "%d Copa do Brasil", "Copa do Brasil", "copa-do-brasil", "nacional"},
+	{banco.Masculino, "en", "%d Supercopa do Brasil", "Supercopa do Brasil", "supercopa", "nacional"},
+	{banco.Masculino, "en", "%d Campeonato Paulista", "Campeonato Paulista", "paulista", "estadual"},
+	{banco.Feminino, "en", "%d Copa Libertadores Femenina", "Copa Libertadores", "libertadores", "continental"},
+	{banco.Feminino, "en", "%d Campeonato Brasileiro de Futebol Feminino Série A1", "Campeonato Brasileiro", "brasileirao", "nacional"},
+	{banco.Feminino, "en", "%d Supercopa do Brasil de Futebol Feminino", "Supercopa do Brasil", "supercopa", "nacional"},
+	{banco.Feminino, "pt", "Campeonato Paulista de Futebol Feminino de %d", "Campeonato Paulista", "paulista", "estadual"},
+	{banco.Feminino, "pt", "Copa do Brasil de Futebol Feminino de %d", "Copa do Brasil", "copa-do-brasil", "nacional"},
+}
+
+// NotaTituloDetectado acompanha os títulos achados pelo quadro da edição.
+const NotaTituloDetectado = "Detectado no quadro de informações da página da edição; a tabela de títulos da Wikipédia ainda não o lista."
+
+// TituloDetectado é um título lido no quadro da página de uma edição.
+type TituloDetectado struct {
+	Titulo banco.Titulo
+	Pagina string // título da página lida
+	URL    string // revisão lida
+	Lingua string
+}
+
+var (
+	reInfoboxEdicao = regexp.MustCompile(`(?i)^(infobox|info/)`)
+	reCampoCampeao  = []string{"champion", "champion_other", "winners", "campeão", "campeao"}
+)
+
+// CampeaoCorinthians diz se o quadro de informações da página aponta o Corinthians
+// como campeão (por link ou pela predefinição {{Futebol Corinthians...}}).
+func CampeaoCorinthians(wikitexto string) bool {
+	caixas := acharPredefinicoes(wikitexto, reInfoboxEdicao)
+	if len(caixas) == 0 {
+		return false
+	}
+	campos := parametrosNomeados(caixas[0].corpo)
+	for _, c := range reCampoCampeao {
+		v := semNotas(campos[c])
+		if v == "" {
+			continue
+		}
+		return reCorinthians.MatchString(v)
+	}
+	return false
+}
+
+// TitulosRecentes lê as páginas das edições dos anos dados e devolve as que
+// apontam o Corinthians como campeão.
+func (w *Wikipedia) TitulosRecentes(ctx context.Context, anos []int) ([]TituloDetectado, error) {
+	var out []TituloDetectado
+	for _, lingua := range []string{"en", "pt"} {
+		api := w.API
+		if lingua == "pt" {
+			api = w.APIpt
+		}
+		type pedido struct {
+			i   int
+			ano int
+		}
+		porTitulo := map[string]pedido{}
+		var titulos []string
+		for i, e := range edicoesComCampeao {
+			if e.lingua != lingua {
+				continue
+			}
+			for _, ano := range anos {
+				t := fmt.Sprintf(e.formato, ano)
+				porTitulo[t] = pedido{i, ano}
+				titulos = append(titulos, t)
+			}
+		}
+		paginas, err := w.wikitextos(ctx, api, titulos)
+		if err != nil {
+			return nil, fmt.Errorf("wikipedia: títulos recentes (%s): %w", lingua, err)
+		}
+		for _, t := range titulos {
+			pg, ok := paginas[t]
+			if !ok || !CampeaoCorinthians(pg.texto) {
+				continue
+			}
+			p := porTitulo[t]
+			e := edicoesComCampeao[p.i]
+			out = append(out, TituloDetectado{
+				Titulo: banco.Titulo{Categoria: e.categoria, Competicao: e.competicao, Slug: e.slug, Escopo: e.escopo,
+					Oficial: true, Ano: p.ano, Nota: NotaTituloDetectado},
+				Pagina: pg.titulo, URL: urlRevisaoEm(lingua, pg.rev), Lingua: lingua,
+			})
+		}
+	}
+	return out, nil
+}

@@ -137,6 +137,8 @@ func componentes() schema {
 			"temporada": inteiro(""),
 			"numero":    inteiro("Número da camisa."),
 			"posicao":   str(""),
+			"jogos":     inteiro("Jogos na temporada, quando a fonte tem estatísticas."),
+			"gols":      inteiro(""),
 		}, "temporada"),
 		"Pessoa": obj("Jogador(a) ou técnico(a).", schema{
 			"wikidata":         str("Código do Wikidata, usado na URL. Ex.: Q102331."),
@@ -240,6 +242,8 @@ func componentes() schema {
 				"numero":        inteiro(""),
 				"posicao":       str(""),
 				"nacionalidade": str("Código FIFA, ex.: BRA."),
+				"jogos":         inteiro("Jogos na temporada, quando a fonte tem estatísticas."),
+				"gols":          inteiro(""),
 			}, "nome")),
 			"fonte": ref("Fonte"),
 		}, "temporada", "temporadas_disponiveis", "elenco"),

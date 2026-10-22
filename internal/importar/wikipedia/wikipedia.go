@@ -26,13 +26,14 @@ const (
 var reTituloTemporada = regexp.MustCompile(`^(\d{4}) (?:Sport Club|SC) Corinthians Paulista (\(women\) )?season$`)
 
 type Wikipedia struct {
-	API    string
+	API    string // Wikipédia em inglês
+	APIpt  string // Wikipédia em português
 	Coleta *coleta.Cliente
 	Pausa  time.Duration // entre páginas, para não pesar nos servidores da Wikimedia
 }
 
 func Novo(c *coleta.Cliente) *Wikipedia {
-	return &Wikipedia{API: APIIngles, Coleta: c, Pausa: 500 * time.Millisecond}
+	return &Wikipedia{API: APIIngles, APIpt: APIPortugues, Coleta: c, Pausa: 500 * time.Millisecond}
 }
 
 // Pagina é uma página de temporada já lida.
@@ -40,6 +41,7 @@ type Pagina struct {
 	Titulo    string
 	Revisao   int64
 	URL       string // link fixo para a revisão lida
+	Lingua    string // en ou pt; vazio é en
 	Categoria string
 	Temporada int
 	Partidas  []banco.Partida
@@ -79,6 +81,11 @@ func (w *Wikipedia) descobrir(ctx context.Context) ([]string, error) {
 
 // buscar devolve, em ordem alfabética, os títulos da busca que casam com padrao.
 func (w *Wikipedia) buscar(ctx context.Context, consulta string, padrao *regexp.Regexp) ([]string, error) {
+	return w.buscarEm(ctx, w.API, consulta, padrao)
+}
+
+// buscarEm é buscar na Wikipédia cuja API é api (outra língua).
+func (w *Wikipedia) buscarEm(ctx context.Context, api, consulta string, padrao *regexp.Regexp) ([]string, error) {
 	q := url.Values{
 		"action":   {"query"},
 		"list":     {"search"},
@@ -86,7 +93,7 @@ func (w *Wikipedia) buscar(ctx context.Context, consulta string, padrao *regexp.
 		"srlimit":  {"500"},
 		"format":   {"json"},
 	}
-	body, err := w.Coleta.Get(ctx, w.API+"?"+q.Encode(), "application/json")
+	body, err := w.Coleta.Get(ctx, api+"?"+q.Encode(), "application/json")
 	if err != nil {
 		return nil, err
 	}
@@ -171,7 +178,7 @@ func (w *Wikipedia) pagina(ctx context.Context, titulo string) (Pagina, error) {
 
 	partidas, avisos := ExtrairPartidas(texto, categoria, temporada)
 	OrdenarPartidas(partidas)
-	elenco := ExtrairElenco(texto, categoria)
+	elenco := MesclarElenco(ExtrairElenco(texto, categoria), ExtrairEstatisticas(texto, categoria))
 	for i := range elenco {
 		elenco[i].Temporada = temporada
 	}

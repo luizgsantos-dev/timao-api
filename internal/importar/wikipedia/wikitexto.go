@@ -153,6 +153,13 @@ func expandir(predef string) string {
 		return " "
 	case nome == "ndash" || nome == "–":
 		return "–"
+	case strings.HasPrefix(nome, "futebol "):
+		// {{Futebol Corinthians|estado=depois}} -> Corinthians (Wikipédia em português)
+		time := strings.TrimSpace(partes[0])[len("futebol "):]
+		return strings.TrimSuffix(strings.TrimSuffix(time, " Feminino"), " feminino")
+	case nome == "arbitro" || nome == "árbitro":
+		// {{Arbitro|BR-PR|PR|[[Heber Roberto Lopes]]}} -> o último parâmetro
+		return strings.TrimSpace(partes[len(partes)-1])
 	}
 	return ""
 }

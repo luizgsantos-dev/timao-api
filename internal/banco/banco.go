@@ -20,7 +20,7 @@ import (
 var schema string
 
 // VersaoEsquema muda sempre que schema.sql mudar de forma incompatível.
-const VersaoEsquema = "4"
+const VersaoEsquema = "5"
 
 const (
 	Masculino = "masculino"
@@ -96,6 +96,8 @@ type Elenco struct {
 	Numero        *int
 	Posicao       string
 	Nacionalidade string // código FIFA, ex.: BRA
+	Jogos         *int   // na temporada, da tabela de estatísticas
+	Gols          *int
 }
 
 type Gol struct {
@@ -228,10 +230,10 @@ func (e *Escritor) Elenco(ctx context.Context, el Elenco, pessoaID, fonteID int6
 		pessoa = pessoaID
 	}
 	_, err := e.tx.ExecContext(ctx, `
-		INSERT INTO elenco (categoria, temporada, pessoa_id, nome, numero, posicao, nacionalidade, fonte_id)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+		INSERT INTO elenco (categoria, temporada, pessoa_id, nome, numero, posicao, nacionalidade, jogos, gols, fonte_id)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT (categoria, temporada, nome) DO NOTHING`,
-		el.Categoria, el.Temporada, pessoa, el.Nome, el.Numero, nulo(el.Posicao), nulo(el.Nacionalidade), fonteID)
+		el.Categoria, el.Temporada, pessoa, el.Nome, el.Numero, nulo(el.Posicao), nulo(el.Nacionalidade), el.Jogos, el.Gols, fonteID)
 	if err != nil {
 		return fmt.Errorf("banco: elenco %d %s: %w", el.Temporada, el.Nome, err)
 	}
@@ -273,6 +275,7 @@ func (e *Escritor) Partida(ctx context.Context, p Partida, fonteID int64) (bool,
 
 // Vizinha é uma partida já gravada perto de uma data, usada para unir fontes.
 type Vizinha struct {
+	ID         int64
 	Data       string
 	Adversario string
 	GolsPro    *int
@@ -283,7 +286,7 @@ type Vizinha struct {
 // da mais próxima para a mais distante.
 func (e *Escritor) PartidasPerto(ctx context.Context, categoria, data string, dias int) ([]Vizinha, error) {
 	antes, depois := fmt.Sprintf("-%d days", dias), fmt.Sprintf("+%d days", dias)
-	rows, err := e.tx.QueryContext(ctx, `SELECT data, adversario, gols_pro, gols_contra FROM partida
+	rows, err := e.tx.QueryContext(ctx, `SELECT id, data, adversario, gols_pro, gols_contra FROM partida
 		WHERE categoria = ? AND data BETWEEN date(?, ?) AND date(?, ?)
 		ORDER BY abs(julianday(data) - julianday(?))`, categoria, data, antes, data, depois, data)
 	if err != nil {
@@ -294,7 +297,7 @@ func (e *Escritor) PartidasPerto(ctx context.Context, categoria, data string, di
 	for rows.Next() {
 		var v Vizinha
 		var gp, gc sql.NullInt64
-		if err := rows.Scan(&v.Data, &v.Adversario, &gp, &gc); err != nil {
+		if err := rows.Scan(&v.ID, &v.Data, &v.Adversario, &gp, &gc); err != nil {
 			return nil, err
 		}
 		if gp.Valid && gc.Valid {
@@ -304,6 +307,47 @@ func (e *Escritor) PartidasPerto(ctx context.Context, categoria, data string, di
 		out = append(out, v)
 	}
 	return out, rows.Err()
+}
+
+// Enriquecer completa uma partida já gravada com os dados de outra fonte, sem
+// sobrescrever nada: preenche horário, fase, estádio, cidade, público e árbitro
+// vazios e, se a partida ainda não tem gols e o placar das duas fontes bate, grava
+// os gols da outra fonte (só quando eles somam o placar). Devolve se mudou algo.
+func (e *Escritor) Enriquecer(ctx context.Context, partidaID int64, p Partida) (bool, error) {
+	res, err := e.tx.ExecContext(ctx, `UPDATE partida SET
+		horario = COALESCE(horario, ?), fase = COALESCE(fase, ?), estadio = COALESCE(estadio, ?),
+		cidade = COALESCE(cidade, ?), publico = COALESCE(publico, ?), arbitro = COALESCE(arbitro, ?)
+		WHERE id = ? AND (
+			(horario IS NULL AND ? IS NOT NULL) OR (fase IS NULL AND ? IS NOT NULL) OR
+			(estadio IS NULL AND ? IS NOT NULL) OR (cidade IS NULL AND ? IS NOT NULL) OR
+			(publico IS NULL AND ? IS NOT NULL) OR (arbitro IS NULL AND ? IS NOT NULL))`,
+		nulo(p.Horario), nulo(p.Fase), nulo(p.Estadio), nulo(p.Cidade), p.Publico, nulo(p.Arbitro), partidaID,
+		nulo(p.Horario), nulo(p.Fase), nulo(p.Estadio), nulo(p.Cidade), p.Publico, nulo(p.Arbitro))
+	if err != nil {
+		return false, fmt.Errorf("banco: enriquecendo partida %d: %w", partidaID, err)
+	}
+	n, _ := res.RowsAffected()
+	mudou := n > 0
+
+	if len(p.Gols) == 0 || p.GolsPro == nil || p.GolsContra == nil || len(p.Gols) != *p.GolsPro+*p.GolsContra {
+		return mudou, nil
+	}
+	var temGols int
+	var gp, gc sql.NullInt64
+	if err := e.tx.QueryRowContext(ctx, `SELECT (SELECT COUNT(*) FROM gol WHERE partida_id = ?), gols_pro, gols_contra
+		FROM partida WHERE id = ?`, partidaID, partidaID).Scan(&temGols, &gp, &gc); err != nil {
+		return mudou, fmt.Errorf("banco: conferindo gols da partida %d: %w", partidaID, err)
+	}
+	if temGols > 0 || !gp.Valid || int(gp.Int64) != *p.GolsPro || int(gc.Int64) != *p.GolsContra {
+		return mudou, nil
+	}
+	for _, g := range p.Gols {
+		if _, err := e.tx.ExecContext(ctx, `INSERT INTO gol (partida_id, lado, autor, autor_wiki_en, minuto, tipo)
+			VALUES (?, ?, ?, ?, ?, ?)`, partidaID, g.Lado, nulo(g.Autor), nulo(g.AutorWikiEN), nulo(g.Minuto), g.Tipo); err != nil {
+			return mudou, fmt.Errorf("banco: gol da partida %d: %w", partidaID, err)
+		}
+	}
+	return true, nil
 }
 
 // MesmoAdversario diz se dois nomes parecem do mesmo time, comparando as palavras

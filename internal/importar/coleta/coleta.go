@@ -4,12 +4,16 @@ package coleta
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"strconv"
 	"time"
 )
+
+// ErrNaoEncontrado indica que o servidor respondeu 404 ou 410 (a página não existe).
+var ErrNaoEncontrado = errors.New("coleta: página não encontrada")
 
 const UserAgent = "timao-api-importador/0.1 (projeto aberto sobre o Corinthians; importacao semanal)"
 
@@ -78,6 +82,9 @@ func (c *Cliente) uma(ctx context.Context, url, accept string) (body []byte, rep
 			depois = time.Duration(s) * time.Second
 		}
 		return nil, true, depois, fmt.Errorf("coleta: %s respondeu %d", url, resp.StatusCode)
+	}
+	if resp.StatusCode == http.StatusNotFound || resp.StatusCode == http.StatusGone {
+		return nil, false, 0, fmt.Errorf("%w: %s respondeu %d", ErrNaoEncontrado, url, resp.StatusCode)
 	}
 	if resp.StatusCode >= 400 {
 		return nil, false, 0, fmt.Errorf("coleta: %s respondeu %d", url, resp.StatusCode)

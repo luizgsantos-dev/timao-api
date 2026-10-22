@@ -28,10 +28,12 @@ type Tecnico struct {
 	WikiEN string
 }
 
-// ExtrairElenco lê o elenco principal da seção "Squad" de uma página de temporada,
-// nas predefinições {{Fs player}}. Subseções de emprestados ficam de fora.
+// ExtrairElenco lê o elenco principal de uma página de temporada, nas predefinições
+// {{Fs player}}. A seção muda de página para página ("==Squad==", "===Squad===" dentro
+// de "Background", "===First team squad===" dentro de "Players"); vale a primeira
+// seção com cara de elenco que tenha jogadores. Subseções de emprestados ficam de fora.
 func ExtrairElenco(wikitexto, categoria string) []banco.Elenco {
-	secao, _ := secaoNivel2(wikitexto, "squad")
+	secao := secaoDoElenco(wikitexto)
 	if secao == "" {
 		return nil
 	}
@@ -64,6 +66,37 @@ func ExtrairElenco(wikitexto, categoria string) []banco.Elenco {
 		out = append(out, e)
 	}
 	return out
+}
+
+var (
+	reTituloElenco = regexp.MustCompile(`(?i)squad|first.team|players|elenco`)
+	reNaoElenco    = regexp.MustCompile(`(?i)statistic|number|loan|out|transfer|former|kit`)
+)
+
+// secaoDoElenco devolve o texto da primeira seção, de qualquer nível, cujo título
+// parece de elenco e que contém {{Fs player}}. A seção vai até o próximo título de
+// nível igual ou maior.
+func secaoDoElenco(texto string) string {
+	titulos := reTitulo.FindAllStringSubmatchIndex(texto, -1)
+	for i, t := range titulos {
+		nome := limpar(texto[t[4]:t[5]])
+		if !reTituloElenco.MatchString(nome) || reNaoElenco.MatchString(nome) {
+			continue
+		}
+		nivel := t[3] - t[2]
+		fim := len(texto)
+		for _, prox := range titulos[i+1:] {
+			if prox[3]-prox[2] <= nivel {
+				fim = prox[0]
+				break
+			}
+		}
+		corpo := texto[t[1]:fim]
+		if len(acharPredefinicoes(corpo, reJogadorElenco)) > 0 {
+			return corpo
+		}
+	}
+	return ""
 }
 
 // ExtrairTecnicos lê o campo "manager" do quadro {{Infobox football club season}}.

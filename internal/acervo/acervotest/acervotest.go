@@ -107,7 +107,7 @@ func Novo(t testing.TB) *acervo.Acervo {
 		Escopo: "continental", Oficial: true, Ano: 2019})
 	// Elenco: Tamires (ligada à pessoa Q2) e uma jogadora sem item no Wikidata.
 	must(esc.Elenco(ctx, banco.Elenco{Categoria: banco.Feminino, Temporada: 2025, Nome: "Sem Item", Posicao: "atacante"}, 0, wiki))
-	must(esc.Elenco(ctx, banco.Elenco{Categoria: banco.Feminino, Temporada: 2025, Nome: "Tamires", Numero: n(37), Posicao: "defensora", Nacionalidade: "BRA"}, idTamires, wiki))
+	must(esc.Elenco(ctx, banco.Elenco{Categoria: banco.Feminino, Temporada: 2025, Nome: "Tamires", Numero: n(37), Posicao: "defensora", Nacionalidade: "BRA", Jogos: n(30), Gols: n(4)}, idTamires, wiki))
 	must(esc.Elenco(ctx, banco.Elenco{Categoria: banco.Feminino, Temporada: 2024, Nome: "Tamires", Numero: n(6), Posicao: "defensora"}, idTamires, wiki))
 
 	must(esc.Concluir(ctx, time.Now()))

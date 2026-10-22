@@ -21,7 +21,7 @@ var (
 	reDigitos     = regexp.MustCompile(`\d`)
 	reMinuto      = regexp.MustCompile(`^(\d{1,3}(?:\+\d{1,2})?)'?$`)
 	reMinutoTxt   = regexp.MustCompile(`(\d{1,3}(?:\+\d{1,2})?)'`)
-	rePredefGol   = regexp.MustCompile(`(?i)\{\{\s*(goal|pengoal|pen goal|ogol|own goal|og)\s*((?:\|[^{}]*)?)\}\}`)
+	rePredefGol   = regexp.MustCompile(`(?i)\{\{\s*(goal|pengoal|pen goal|ogol|own goal|og|gol de pênalti|gol pênalti|golpen|gol contra|golc|gol)\s*((?:\|[^{}]*)?)\}\}`)
 	reGolContra   = regexp.MustCompile(`(?i)\bo\.?\s?g\.?\b|own goal|gol contra`)
 	reGolPenalti  = regexp.MustCompile(`(?i)^(pen\.?|p|penalty|pk)$`)
 	reCorinthians = regexp.MustCompile(`(?i)corinthians`)
@@ -86,8 +86,22 @@ func extrair(wikitexto, categoria string, temporada int, competicao string) ([]b
 	return partidas, avisos
 }
 
+// Campos da caixa de jogo da Wikipédia em português ({{footballbox}}) -> nomes em inglês.
+var camposPT = map[string]string{
+	"data": "date", "hora": "time", "time1": "team1", "time2": "team2", "placar": "score",
+	"gols1": "goals1", "gols2": "goals2", "estadio": "stadium", "estádio": "stadium",
+	"local": "location", "cidade": "location", "publico": "attendance", "público": "attendance",
+	"arbitro": "referee", "árbitro": "referee", "rodada": "round", "fase": "round",
+	"penaltis": "penaltyscore", "pênaltis": "penaltyscore",
+}
+
 func lerCaixa(corpo string, temporada int) (banco.Partida, error) {
 	campos := parametrosNomeados(corpo)
+	for pt, en := range camposPT {
+		if v, ok := campos[pt]; ok && campos[en] == "" {
+			campos[en] = v
+		}
+	}
 	var p banco.Partida
 
 	time1, time2 := limpar(campos["team1"]), limpar(campos["team2"])
@@ -203,6 +217,34 @@ func corrigirAno(data string, temporada int) (string, bool) {
 	return time.Date(temporada, t.Month(), t.Day(), 0, 0, 0, 0, time.UTC).Format("2006-01-02"), true
 }
 
+var (
+	reDataPT = regexp.MustCompile(`(?i)^(\d{1,2})º?\s+de\s+([a-zç]+)(?:\s+de\s+(\d{4}))?`)
+	mesesPT  = map[string]int{"janeiro": 1, "fevereiro": 2, "março": 3, "marco": 3, "abril": 4, "maio": 5, "junho": 6,
+		"julho": 7, "agosto": 8, "setembro": 9, "outubro": 10, "novembro": 11, "dezembro": 12}
+)
+
+// dataEmPortugues entende "2 de abril de 2003" e "1º de julho" (com o ano da temporada).
+func dataEmPortugues(texto string, temporada int) (string, bool) {
+	m := reDataPT.FindStringSubmatch(texto)
+	if m == nil {
+		return "", false
+	}
+	mes, ok := mesesPT[strings.ToLower(m[2])]
+	if !ok {
+		return "", false
+	}
+	dia, _ := strconv.Atoi(m[1])
+	ano := temporada
+	if m[3] != "" {
+		ano, _ = strconv.Atoi(m[3])
+	}
+	t := time.Date(ano, time.Month(mes), dia, 0, 0, 0, 0, time.UTC)
+	if t.Day() != dia {
+		return "", false
+	}
+	return t.Format("2006-01-02"), true
+}
+
 var formatosData = []string{"2 January 2006", "January 2, 2006", "2006-01-02", "2 Jan 2006", "Jan 2, 2006", "January 2 2006"}
 
 // lerData entende a predefinição {{start date}} e datas por extenso em inglês.
@@ -217,6 +259,9 @@ func lerData(valor string, temporada int) (string, error) {
 	texto := limpar(valor)
 	if i := strings.IndexByte(texto, '('); i > 0 {
 		texto = strings.TrimSpace(texto[:i])
+	}
+	if d, ok := dataEmPortugues(texto, temporada); ok {
+		return d, nil
 	}
 	for _, tentativa := range []string{texto, texto + " " + strconv.Itoa(temporada)} {
 		for _, f := range formatosData {
@@ -267,9 +312,9 @@ func lerGols(valor, lado string) []banco.Gol {
 			nome := strings.ToLower(m[1])
 			padrao := "normal"
 			switch {
-			case nome == "pengoal" || nome == "pen goal":
+			case nome == "pengoal" || nome == "pen goal" || nome == "golpen" || strings.Contains(nome, "pênalti"):
 				padrao = "penalti"
-			case nome == "ogol" || nome == "own goal" || nome == "og" || contraNaLinha:
+			case nome == "ogol" || nome == "own goal" || nome == "og" || nome == "gol contra" || nome == "golc" || contraNaLinha:
 				padrao = "contra"
 			}
 			for _, g := range minutosDaPredefinicao(m[2], padrao) {

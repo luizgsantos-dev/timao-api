@@ -72,6 +72,8 @@ CREATE TABLE elenco (
     numero        INTEGER,
     posicao       TEXT,
     nacionalidade TEXT,                          -- código FIFA, ex.: BRA
+    jogos         INTEGER,                       -- na temporada, quando a página tem estatísticas
+    gols          INTEGER,
     fonte_id      INTEGER NOT NULL REFERENCES fonte(id),
     UNIQUE (categoria, temporada, nome)
 );
