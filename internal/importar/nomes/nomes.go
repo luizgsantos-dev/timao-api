@@ -43,7 +43,8 @@ var (
 		"group stage": "Fase de grupos", "league stage": "Fase de liga",
 		"first leg": "Ida", "second leg": "Volta",
 		"knockout round play-offs": "Playoffs", "knockout stages": "Mata-mata", "knockout stage": "Mata-mata",
-		"third place": "Disputa de 3º lugar", "3rd place match": "Disputa de 3º lugar",
+		"third place": "Disputa de 3º lugar", "3rd place match": "Disputa de 3º lugar", "match 3rd place": "Disputa de 3º lugar",
+		"match 5th place": "Disputa de 5º lugar", "match for fifth place": "Disputa de 5º lugar",
 		"friendly": "", "pre-season & friendlies": "",
 	}
 )

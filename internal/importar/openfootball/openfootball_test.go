@@ -72,3 +72,34 @@ func TestExtrair(t *testing.T) {
 		}
 	}
 }
+
+// Trecho de openfootball/club-worldcup, 2000/clubworldcup.txt.
+const mundialTeste = `= Club World Cup 2000
+
+▪ Group A
+  Wed Jan 5 2000
+           Al Nassr (KSA)          v Real Madrid (ESP)        1-3 (1-1)
+           Corinthians SP (BRA)    v Raja Casablanca (MAR)    2-0 (0-0)
+
+▪ Match 3rd place
+  Fri Jan 14
+           Real Madrid (ESP)       v Club Necaxa (MEX)        3-4 pen. 1-1 a.e.t. (1-1, 1-0)
+
+▪ Final
+  Fri Jan 14
+           Vasco da Gama RJ (BRA)  v Corinthians SP (BRA)     3-4 pen. 0-0 a.e.t. (0-0)
+`
+
+func TestExtrairMundial(t *testing.T) {
+	ps := Extrair(mundialTeste, "Mundial de Clubes da FIFA", 2000)
+	if len(ps) != 2 {
+		t.Fatalf("esperava 2 partidas do Corinthians, vieram %d: %+v", len(ps), ps)
+	}
+	if p := ps[0]; p.Data != "2000-01-05" || p.Fase != "Grupo A" || p.Adversario != "Raja Casablanca" || *p.GolsPro != 2 {
+		t.Errorf("fase de grupos: %+v", p)
+	}
+	if p := ps[1]; p.Data != "2000-01-14" || p.Fase != "Final" || p.Mando != "fora" || p.Adversario != "Vasco da Gama" ||
+		*p.GolsPro != 0 || *p.GolsContra != 0 || *p.PenaltisPro != 4 || *p.PenaltisContra != 3 {
+		t.Errorf("final nos pênaltis: %+v", p)
+	}
+}

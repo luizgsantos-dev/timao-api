@@ -1,7 +1,8 @@
-// Package openfootball importa partidas do repositório openfootball/south-america
-// (domínio público, CC0), no formato texto Football.TXT. Ele cobre Brasileirão,
-// Copa do Brasil, Libertadores e Sul-Americana, com placar, fase e horário, mas
-// sem autores dos gols. Só entram as partidas do Corinthians (masculino).
+// Package openfootball importa partidas dos repositórios openfootball/south-america
+// e openfootball/club-worldcup (domínio público, CC0), no formato texto
+// Football.TXT. Eles cobrem Brasileirão, Copa do Brasil, Libertadores,
+// Sul-Americana e Mundial de Clubes, com placar, fase e horário, mas sem autores
+// dos gols. Só entram as partidas do Corinthians (masculino).
 package openfootball
 
 import (
@@ -20,18 +21,24 @@ import (
 )
 
 const (
-	Licenca = "CC0 1.0"
-	repo    = "openfootball/south-america"
+	Licenca      = "CC0 1.0"
+	southAmerica = "openfootball/south-america"
+	clubWorldCup = "openfootball/club-worldcup"
 )
 
-// Pastas e sufixos de arquivo -> competição.
+// Arquivos de cada repositório -> competição. O caminho tem a temporada no
+// primeiro grupo.
 var arquivos = []struct {
-	pasta, sufixo, competicao string
+	repo       string
+	caminho    *regexp.Regexp
+	competicao string
 }{
-	{"brazil", "_br1.txt", "Campeonato Brasileiro"},
-	{"brazil", "_brcup.txt", "Copa do Brasil"},
-	{"copa-libertadores", "_copal.txt", "Copa Libertadores"},
-	{"copa-libertadores", "_copas.txt", "Copa Sul-Americana"},
+	{southAmerica, regexp.MustCompile(`^brazil/(\d{4})_br1\.txt$`), "Campeonato Brasileiro"},
+	{southAmerica, regexp.MustCompile(`^brazil/(\d{4})_brcup\.txt$`), "Copa do Brasil"},
+	{southAmerica, regexp.MustCompile(`^copa-libertadores/(\d{4})_copal\.txt$`), "Copa Libertadores"},
+	{southAmerica, regexp.MustCompile(`^copa-libertadores/(\d{4})_copas\.txt$`), "Copa Sul-Americana"},
+	// A pasta "more" do mesmo repositório usa outro formato de linha; vale a do ano.
+	{clubWorldCup, regexp.MustCompile(`^(\d{4})/clubworldcup\.txt$`), "Mundial de Clubes da FIFA"},
 }
 
 type OpenFootball struct {
@@ -42,8 +49,8 @@ type OpenFootball struct {
 
 func Novo(c *coleta.Cliente) *OpenFootball {
 	return &OpenFootball{
-		API:    "https://api.github.com/repos/" + repo + "/contents/",
-		Raw:    "https://raw.githubusercontent.com/" + repo + "/master/",
+		API:    "https://api.github.com/repos/",
+		Raw:    "https://raw.githubusercontent.com/",
 		Coleta: c,
 	}
 }
@@ -55,35 +62,32 @@ type Arquivo struct {
 	Partidas []banco.Partida
 }
 
-// Partidas lista os arquivos de cada pasta e extrai as partidas do Corinthians.
+// Partidas lista os arquivos de cada repositório e extrai as partidas do Corinthians.
 func (o *OpenFootball) Partidas(ctx context.Context) ([]Arquivo, error) {
 	var out []Arquivo
 	listados := map[string][]string{}
 	for _, a := range arquivos {
-		nomes, ok := listados[a.pasta]
+		caminhos, ok := listados[a.repo]
 		if !ok {
 			var err error
-			if nomes, err = o.listar(ctx, a.pasta); err != nil {
-				return nil, fmt.Errorf("openfootball: listando %s: %w", a.pasta, err)
+			if caminhos, err = o.listar(ctx, a.repo); err != nil {
+				return nil, fmt.Errorf("openfootball: listando %s: %w", a.repo, err)
 			}
-			listados[a.pasta] = nomes
+			listados[a.repo] = caminhos
 		}
-		for _, nome := range nomes {
-			if !strings.HasSuffix(nome, a.sufixo) {
+		for _, caminho := range caminhos {
+			m := a.caminho.FindStringSubmatch(caminho)
+			if m == nil {
 				continue
 			}
-			temporada, err := strconv.Atoi(strings.TrimSuffix(nome, a.sufixo))
+			temporada, _ := strconv.Atoi(m[1])
+			body, err := o.Coleta.Get(ctx, o.Raw+a.repo+"/master/"+caminho, "")
 			if err != nil {
-				continue
-			}
-			caminho := a.pasta + "/" + nome
-			body, err := o.Coleta.Get(ctx, o.Raw+caminho, "")
-			if err != nil {
-				return nil, fmt.Errorf("openfootball: %s: %w", caminho, err)
+				return nil, fmt.Errorf("openfootball: %s/%s: %w", a.repo, caminho, err)
 			}
 			out = append(out, Arquivo{
-				Caminho:  caminho,
-				URL:      "https://github.com/" + repo + "/blob/master/" + caminho,
+				Caminho:  strings.TrimPrefix(a.repo, "openfootball/") + "/" + caminho,
+				URL:      "https://github.com/" + a.repo + "/blob/master/" + caminho,
 				Partidas: Extrair(string(body), a.competicao, temporada),
 			})
 		}
@@ -91,23 +95,34 @@ func (o *OpenFootball) Partidas(ctx context.Context) ([]Arquivo, error) {
 	return out, nil
 }
 
-func (o *OpenFootball) listar(ctx context.Context, pasta string) ([]string, error) {
-	body, err := o.Coleta.Get(ctx, o.API+pasta, "application/vnd.github+json")
+// listar devolve os caminhos de todos os arquivos do repositório, numa só
+// requisição à API de árvores do GitHub.
+func (o *OpenFootball) listar(ctx context.Context, repo string) ([]string, error) {
+	body, err := o.Coleta.Get(ctx, o.API+repo+"/git/trees/master?recursive=1", "application/vnd.github+json")
 	if err != nil {
 		return nil, err
 	}
-	var itens []struct {
-		Name string `json:"name"`
+	var arvore struct {
+		Tree []struct {
+			Path string `json:"path"`
+			Type string `json:"type"`
+		} `json:"tree"`
+		Truncated bool `json:"truncated"`
 	}
-	if err := json.Unmarshal(body, &itens); err != nil {
+	if err := json.Unmarshal(body, &arvore); err != nil {
 		return nil, fmt.Errorf("resposta inválida: %w", err)
 	}
-	nomes := make([]string, 0, len(itens))
-	for _, i := range itens {
-		nomes = append(nomes, i.Name)
+	if arvore.Truncated {
+		return nil, fmt.Errorf("a listagem de %s veio incompleta", repo)
 	}
-	sort.Strings(nomes)
-	return nomes, nil
+	var caminhos []string
+	for _, i := range arvore.Tree {
+		if i.Type == "blob" {
+			caminhos = append(caminhos, i.Path)
+		}
+	}
+	sort.Strings(caminhos)
+	return caminhos, nil
 }
 
 var (

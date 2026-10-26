@@ -53,8 +53,47 @@ Levantamento feito em 22/10/2026, consultando cada fonte diretamente. Os número
 - **Correção:** o Paulista Feminino de 2025 foi do Palmeiras (5 x 2 no agregado); o Corinthians venceu só a volta.
 - **Sem saída aberta:** CBF (termos proíbem reprodução), Federação Paulista (bloqueia acesso automático), elencos e técnicos das Brabas antes de 2018.
 
+## Atualização: fontes oficiais (26/10/2026)
+
+Busca dirigida a fontes oficiais, primeiro nacionais, depois internacionais e por fim do próprio clube, atrás do que falta: jogos das Brabas de 2016 a 2021 (e de antes), técnicos(as) das Brabas antes de 2018, gols antigos e datas da Copa do Brasil de 1989 a 1999. **Nenhuma fonte oficial libera importação automática.** Os pedidos de autorização estão redigidos em `docs/pedidos-de-autorizacao.md`.
+
+### Nacionais
+
+- **CBF:** os termos de uso proíbem "copiar, reproduzir e alterar, total ou parcialmente, qualquer dado, informação, conteúdo", e qualquer "utilização, comercial ou não comercial, não especificamente autorizada". As **súmulas em PDF** (`conteudo.cbf.com.br/sumulas/{ano}/{código}se.pdf`) são o melhor material que existe: data, estádio, árbitro, escalações e gols com minuto. Há súmulas da Série A desde 2013 e do Brasileirão Feminino A1 de 2018 a 2021. A API interna (`cms.cbf.com.br`) exige token e não deve ser usada. Pedido: contato@cbf.com.br.
+- **Federação Paulista:** tabelas e súmulas do Paulista Feminino (idCampeonato=128), mas o site bloqueia acesso automático (Cloudflare) e não publica termos de uso. Pedido: imprensa@fpf.org.br.
+- **Governo e academia:** dados.gov.br e os repositórios acadêmicos não têm dados de partidas. A Lei de Acesso à Informação não alcança CBF e FPF, que são entidades privadas. A Base dos Dados deriva do Transfermarkt, que proíbe reuso.
+- **Hemeroteca Digital (Biblioteca Nacional):** jornais digitalizados com os jogos antigos (Copa do Brasil 1989–1999, Paulista antigo, Brabas 1997–2009). A consulta é manual, página por página, e a Biblioteca não licencia o uso das imagens; os fatos (data, placar) podem ser conferidos ali. Contato: dacps@bn.gov.br, (21) 3095-3874.
+- **Museu do Futebol:** possível contato de pesquisa, sem acervo de dados aberto.
+
+### Internacionais
+
+- **CONMEBOL:** os termos permitem só "consumo privado y doméstico". Sem dados abertos da Libertadores Feminina de 2009 a 2016.
+- **FIFA:** termos proíbem reuso; a API usada pelo site não é documentada. A IFFHS não tem nada útil.
+- **openfootball/club-worldcup** (CC0): Mundial de Clubes de 2000 e de 2005 em diante, com datas, fases e placares; os arquivos `more/*-full.txt` trazem também gols e escalações. **Importado.** Os seis jogos do Corinthians (2000 e 2012) já estavam no banco, com gols, pela Wikipédia; o openfootball confirma os placares e completa fase e horário.
+- **Kaggle, ricardomattos05** (CC BY 4.0): vale uma conferência manual do conteúdo antes de qualquer uso.
+
+### Corinthians
+
+- **Site oficial:** não tem página de termos de uso, só "Todos os direitos reservados" no rodapé. O `robots.txt` libera tudo menos `/site/`, `/portal/`, `/noticias/ver/` e `default.asp`, mas o CloudFront bloqueia acessos que não venham de navegador. Contornar isso não é recomendável.
+- **Arquivo de notícias** (desde 19/03/2016): a melhor fonte oficial para as Brabas de 2016 a 2021, com placares, gols e técnicos nos relatos de jogo. Extração semimanual, só dos fatos.
+- **Calendário** (JSON usado pela página de agenda): de 2018 em diante, sem placares. Os álbuns da Agência Corinthians, desde 2008, ajudam a confirmar datas.
+- **Memorial do Corinthians:** acervo físico, atende pesquisadores. Única via oficial para as Brabas de 1997 a 2009. Contato: cultural@sccorinthians.com.br, memorial@sccorinthians.com.br.
+- **Almanaque do Timão:** todos os jogos desde 1910, mas é obra protegida; serve só para conferência. **Meu Timão** não é oficial e não tem licença de reuso.
+- Pedido de autorização: comunicacao@sccorinthians.com.br, (11) 2095-3000.
+
+### O que fazer com cada lacuna
+
+| Lacuna | Caminho |
+|---|---|
+| Brabas 2018–2021 | Súmulas do A1 (CBF), se autorizado |
+| Brabas 2016–2021 (Paulista e demais) | Notícias do clube e FPF, se autorizado; até lá, só conferência |
+| Brabas 1997–2009 e técnicos(as) antes de 2018 | Memorial do Corinthians e Hemeroteca (manual) |
+| Gols do Brasileirão de 2014 | Súmulas da Série A (CBF), se autorizado |
+| Datas da Copa do Brasil 1989–1999 | Hemeroteca (manual) |
+
 ## Descartadas
 
-- **ogol, Transfermarkt, Sofascore, site oficial:** os termos de uso proíbem coleta automática.
+- **ogol, Transfermarkt, Sofascore:** os termos de uso proíbem coleta automática.
+- **Site oficial do Corinthians:** sem termos de uso publicados, mas com todos os direitos reservados e bloqueio a acesso automático; ver a seção de fontes oficiais.
 - **adaoduque/Brasileirao_Dataset:** sem licença, então todos os direitos são reservados. Só dá para usar com autorização do autor.
 - **API-Football:** boa cobertura, mas 100 requisições/dia e exige cadastro. Fica como alternativa.
