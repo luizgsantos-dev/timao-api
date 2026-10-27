@@ -82,9 +82,10 @@ func Novo(t testing.TB) *acervo.Acervo {
 	partida(banco.Partida{Categoria: banco.Feminino, Temporada: 2025, Data: "2025-05-05", Competicao: "Campeonato Brasileiro",
 		Adversario: "Palmeiras", Mando: "casa", GolsPro: n(3), GolsContra: n(0),
 		Gols: []banco.Gol{
-			{Lado: "pro", Autor: "Tamires", AutorWikiEN: "Tamires", Minuto: "5", Tipo: "normal"},
-			{Lado: "pro", Autor: "Tamires", AutorWikiEN: "Tamires", Minuto: "15", Tipo: "normal"},
+			// Fora de ordem de propósito: a API devolve por minuto.
 			{Lado: "pro", Autor: "Gabi Zanotti", Minuto: "90+1", Tipo: "normal"},
+			{Lado: "pro", Autor: "Tamires", AutorWikiEN: "Tamires", Minuto: "15", Tipo: "normal"},
+			{Lado: "pro", Autor: "Tamires", AutorWikiEN: "Tamires", Minuto: "5", Tipo: "normal"},
 		}})
 	partida(banco.Partida{Categoria: banco.Feminino, Temporada: 2026, Data: "2026-12-01", Competicao: "Copa Libertadores",
 		Adversario: "Boca Juniors", Mando: "fora"})

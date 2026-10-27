@@ -2,6 +2,7 @@ package banco
 
 import (
 	"context"
+	"database/sql"
 	"os"
 	"path/filepath"
 	"testing"
@@ -164,5 +165,76 @@ func TestEnriquecer(t *testing.T) {
 	incompleto := Partida{GolsPro: n(1), GolsContra: n(0), Gols: []Gol{}}
 	if mudou, _ := esc.Enriquecer(ctx, vs[0].ID, incompleto); mudou {
 		t.Fatal("sem gols nem campos novos, não deveria mudar")
+	}
+}
+
+func TestNomesMandoEPassagens(t *testing.T) {
+	ctx := context.Background()
+	esc, err := Criar(ctx, filepath.Join(t.TempDir(), "timao.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer esc.Descartar()
+	wd, _ := esc.Fonte(ctx, Fonte{Nome: "Wikidata", URL: "wd", Licenca: "CC0", ColetadoEm: time.Now()})
+	wp, _ := esc.Fonte(ctx, Fonte{Nome: "Wikipédia (en): teste", URL: "wp", Licenca: "CC BY-SA 4.0", ColetadoEm: time.Now()})
+	n := func(v int) *int { return &v }
+
+	// Nome de uso vem do título do artigo em inglês; o rótulo vira nome completo.
+	dida, _ := esc.Pessoa(ctx, Pessoa{Wikidata: "Q1", Nome: "Nelson de Jesus Silva", WikiEN: "Dida (footballer, born 1973)"}, wd)
+	zanotti, _ := esc.Pessoa(ctx, Pessoa{Wikidata: "Q2", Nome: "Gabi Zanotti", WikiEN: "Gabi Zanotti"}, wd)
+	var nome, busca string
+	var completo sql.NullString
+	_ = esc.tx.QueryRowContext(ctx, `SELECT nome, nome_completo, nome_busca FROM pessoa WHERE id = ?`, dida).Scan(&nome, &completo, &busca)
+	if nome != "Dida" || completo.String != "Nelson de Jesus Silva" || busca != "dida nelson de jesus silva" {
+		t.Errorf("nome de uso: %q %q %q", nome, completo.String, busca)
+	}
+	_ = esc.tx.QueryRowContext(ctx, `SELECT nome_completo FROM pessoa WHERE id = ?`, zanotti).Scan(&completo)
+	if completo.Valid {
+		t.Errorf("nome completo igual ao de uso não deveria ser gravado: %q", completo.String)
+	}
+
+	// Adversário pela tabela de nomes; mando neutro em sede única.
+	if _, err := esc.Partida(ctx, Partida{Categoria: Masculino, Temporada: 2010, Data: "2010-05-01", Adversario: "Atlético-PR",
+		Mando: "casa"}, wp); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := esc.Partida(ctx, Partida{Categoria: Feminino, Temporada: 2018, Data: "2018-11-20", Competicao: "Copa Libertadores",
+		Adversario: "Colo-Colo", Mando: "casa", GolsPro: n(1), GolsContra: n(0),
+		Gols: []Gol{{Lado: "pro", Autor: "Zanotti", AutorWikiEN: "Gabi Zanotti", Minuto: "10", Tipo: "normal"}}}, wp); err != nil {
+		t.Fatal(err)
+	}
+	var adv, mando string
+	_ = esc.tx.QueryRowContext(ctx, `SELECT adversario FROM partida WHERE data = '2010-05-01'`).Scan(&adv)
+	_ = esc.tx.QueryRowContext(ctx, `SELECT mando FROM partida WHERE data = '2018-11-20'`).Scan(&mando)
+	if adv != "Atlético Paranaense" || mando != "neutro" {
+		t.Errorf("adversário %q, mando %q", adv, mando)
+	}
+
+	// Passagem deduzida da Wikipédia recua até o primeiro gol; a do Wikidata não muda.
+	_ = esc.Passagem(ctx, zanotti, Passagem{Categoria: Feminino, Funcao: "jogador", Inicio: "2022"}, wp)
+	_ = esc.Passagem(ctx, dida, Passagem{Categoria: Feminino, Funcao: "jogador", Inicio: "2022"}, wd)
+	if mudou, err := esc.AjustarPassagensPelosGols(ctx); err != nil || mudou != 1 {
+		t.Fatalf("esperava 1 passagem ajustada: %d %v", mudou, err)
+	}
+	var inicio string
+	_ = esc.tx.QueryRowContext(ctx, `SELECT inicio FROM passagem WHERE pessoa_id = ?`, zanotti).Scan(&inicio)
+	if inicio != "2018" {
+		t.Errorf("início deveria recuar para 2018: %q", inicio)
+	}
+}
+
+func TestNomeDoAdversario(t *testing.T) {
+	casos := map[string]string{
+		"Atlético-MG":          "Atlético Mineiro",
+		"Port. Santista":       "Portuguesa Santista",
+		"XV de Novembro (Jaú)": "XV de Jaú",
+		"SC Internacional":     "SC Internacional", // o paulista de 1913, não o gaúcho
+		"Bragantino":           "Bragantino",       // nome histórico fica
+		" Palmeiras ":          "Palmeiras",
+	}
+	for in, want := range casos {
+		if got := NomeDoAdversario(in); got != want {
+			t.Errorf("NomeDoAdversario(%q) = %q, esperava %q", in, got, want)
+		}
 	}
 }

@@ -72,6 +72,11 @@ func Executar(ctx context.Context, log *slog.Logger, saida string, detalhes bool
 	if err := importarBrasileirao(ctx, log, esc, brasileirao.Novo(c), detalhes); err != nil {
 		return err
 	}
+	ajustadas, err := esc.AjustarPassagensPelosGols(ctx)
+	if err != nil {
+		return err
+	}
+	log.Info("passagens recuadas até o primeiro gol", "passagens", ajustadas)
 
 	if err := esc.Concluir(ctx, inicio); err != nil {
 		return err

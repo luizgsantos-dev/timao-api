@@ -22,7 +22,7 @@ type ListaPessoas struct {
 	Pessoas []Pessoa `json:"pessoas"`
 }
 
-const colunasPessoa = `pe.id, pe.wikidata, pe.nome, pe.genero, pe.nascimento, pe.falecimento,
+const colunasPessoa = `pe.id, pe.wikidata, pe.nome, pe.nome_completo, pe.genero, pe.nascimento, pe.falecimento,
 	pe.nacionalidade, pe.posicao, pe.foto_url, pe.wiki_pt, pe.wiki_en, f.nome, f.url, f.licenca`
 
 // Pessoas lista quem passou pela categoria, em ordem alfabética.
@@ -138,12 +138,13 @@ type linha interface{ Scan(...any) error }
 
 func lerPessoa(r linha) (Pessoa, error) {
 	var p Pessoa
-	var genero, nasc, morte, nac, pos, foto, wikiPT, wikiEN sql.NullString
-	err := r.Scan(&p.id, &p.Wikidata, &p.Nome, &genero, &nasc, &morte, &nac, &pos, &foto, &wikiPT, &wikiEN,
+	var completo, genero, nasc, morte, nac, pos, foto, wikiPT, wikiEN sql.NullString
+	err := r.Scan(&p.id, &p.Wikidata, &p.Nome, &completo, &genero, &nasc, &morte, &nac, &pos, &foto, &wikiPT, &wikiEN,
 		&p.Fonte.Nome, &p.Fonte.URL, &p.Fonte.Licenca)
 	if err != nil {
 		return p, err
 	}
+	p.NomeCompleto = completo.String
 	p.Genero, p.Nascimento, p.Falecimento, p.FotoURL = genero.String, nasc.String, morte.String, foto.String
 	p.Nacionalidade, p.Posicao = lista(nac), lista(pos)
 	p.WikipediaPT, p.WikipediaEN = linkWiki("pt", wikiPT), linkWiki("en", wikiEN)

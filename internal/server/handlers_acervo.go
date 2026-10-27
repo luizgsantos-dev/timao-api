@@ -64,7 +64,7 @@ func (s *Server) registrarAcervo(mux *http.ServeMux, sec secao) {
 		params: []schema{
 			pTemporada, pCompetPar,
 			q("adversario", "Parte do nome do adversário, sem diferenciar acentos.", schema{"type": "string", "example": "palmeiras"}),
-			q("mando", "", strEnum("", "casa", "fora")),
+			q("mando", "neutro = competição disputada em sede única (Mundial de Clubes; Libertadores Feminina).", strEnum("", "casa", "fora", "neutro")),
 			q("resultado", "", strEnum("", "vitoria", "empate", "derrota")),
 			q("de", "Data inicial, AAAA-MM-DD.", schema{"type": "string", "format": "date"}),
 			q("ate", "Data final, AAAA-MM-DD.", schema{"type": "string", "format": "date"}),
@@ -250,7 +250,7 @@ func (s *Server) partidas(sec secao) http.HandlerFunc {
 			Temporada:  q.inteiro("temporada"),
 			Competicao: q.texto("competicao"),
 			Adversario: q.texto("adversario"),
-			Mando:      q.opcao("mando", "casa", "fora"),
+			Mando:      q.opcao("mando", "casa", "fora", "neutro"),
 			Resultado:  q.opcao("resultado", "vitoria", "empate", "derrota"),
 			De:         q.data("de"),
 			Ate:        q.data("ate"),

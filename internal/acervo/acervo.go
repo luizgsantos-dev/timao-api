@@ -99,7 +99,8 @@ type Passagem struct {
 
 type Pessoa struct {
 	Wikidata      string     `json:"wikidata"`
-	Nome          string     `json:"nome"`
+	Nome          string     `json:"nome"`                    // nome de uso
+	NomeCompleto  string     `json:"nome_completo,omitempty"` // quando difere do nome de uso
 	Genero        string     `json:"genero,omitempty"`
 	Nascimento    string     `json:"nascimento,omitempty"`
 	Falecimento   string     `json:"falecimento,omitempty"`
@@ -109,8 +110,10 @@ type Pessoa struct {
 	WikipediaPT   string     `json:"wikipedia_pt,omitempty"`
 	WikipediaEN   string     `json:"wikipedia_en,omitempty"`
 	Passagens     []Passagem `json:"passagens"`
-	// GolsEmPartidas conta os gols registrados nas partidas do acervo. Só vem no
-	// detalhe, e só quando a pessoa tem artigo na Wikipédia em inglês para ligar.
+	// GolsEmPartidas conta os gols registrados nas partidas do acervo, amistosos e
+	// temporadas sem elenco publicado incluídos; por isso pode passar da soma dos
+	// elencos. Só vem no detalhe, e só quando a pessoa tem artigo na Wikipédia em
+	// inglês para ligar.
 	GolsEmPartidas *int             `json:"gols_em_partidas,omitempty"`
 	Elencos        []ElencoDaPessoa `json:"elencos,omitempty"` // só no detalhe
 	Fonte          Fonte            `json:"fonte"`
@@ -148,7 +151,7 @@ type Partida struct {
 
 type Gol struct {
 	Minuto   string `json:"minuto,omitempty"`
-	Autor    string `json:"autor,omitempty"`
+	Autor    string `json:"autor,omitempty"`    // nome de uso da pessoa, quando ligada; senão, como a fonte escreveu
 	Wikidata string `json:"wikidata,omitempty"` // da pessoa autora, quando ligada
 	Tipo     string `json:"tipo"`               // normal, penalti ou contra
 	Time     string `json:"time"`               // quem ganhou o gol: corinthians ou adversario

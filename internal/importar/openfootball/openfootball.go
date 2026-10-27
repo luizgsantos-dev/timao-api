@@ -212,9 +212,51 @@ func resolverData(semana, mes, dia, ano string, temporada int) string {
 	return ""
 }
 
-// nomeDoTime tira o país ("(ARG)") e a sigla do estado ("RJ") do nome.
+// Nomes oficiais que os arquivos brasileiros usam -> nome de uso, o mesmo das
+// outras fontes. Os que só têm a sigla do estado ("Flamengo RJ") não precisam.
+var nomesDeUso = map[string]string{
+	"AC Goianiense":       "Atlético Goianiense",
+	"América MG":          "América Mineiro",
+	"Avaí SC":             "Avaí",
+	"Botafogo FR":         "Botafogo",
+	"CA Mineiro":          "Atlético Mineiro",
+	"CA Paranaense":       "Athletico Paranaense",
+	"CR Flamengo":         "Flamengo",
+	"CR Vasco da Gama":    "Vasco da Gama",
+	"Ceará SC":            "Ceará",
+	"Chapecoense AF":      "Chapecoense",
+	"Clube do Remo":       "Remo",
+	"Coritiba FBC":        "Coritiba",
+	"Criciúma EC":         "Criciúma",
+	"Cruzeiro EC":         "Cruzeiro",
+	"Cuiabá EC":           "Cuiabá",
+	"EC Bahia":            "Bahia",
+	"EC Juventude":        "Juventude",
+	"EC Vitória":          "Vitória",
+	"Fluminense FC":       "Fluminense",
+	"Fortaleza EC":        "Fortaleza",
+	"Grêmio FBPA":         "Grêmio",
+	"Grêmio Porto Alegre": "Grêmio",
+	"Mirassol FC":         "Mirassol",
+	"Paraná Clube":        "Paraná",
+	"RB Bragantino":       "Red Bull Bragantino",
+	"SC Internacional":    "Internacional",
+	"SC Recife":           "Sport Recife",
+	"SE Palmeiras":        "Palmeiras",
+	"Santos FC":           "Santos",
+	"São Paulo FC":        "São Paulo",
+}
+
+var reAnotacao = regexp.MustCompile(`\s*\[[^\]]*\]$`) // "[postponed]"
+
+// nomeDoTime tira o país ("(ARG)"), anotações ("[postponed]") e a sigla do estado
+// ("RJ") do nome, e troca o nome oficial pelo de uso.
 func nomeDoTime(s string) string {
-	s = rePais.ReplaceAllString(strings.TrimSpace(s), "")
+	s = reAnotacao.ReplaceAllString(strings.TrimSpace(s), "")
+	s = rePais.ReplaceAllString(s, "")
+	if n, ok := nomesDeUso[s]; ok {
+		return n
+	}
 	return reEstado.ReplaceAllString(s, "")
 }
 

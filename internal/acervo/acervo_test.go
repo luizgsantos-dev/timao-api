@@ -3,6 +3,7 @@ package acervo_test
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 
 	"timao-api/internal/acervo"
@@ -126,6 +127,21 @@ func TestPartida(t *testing.T) {
 	}
 	if _, err := ac.Partida(ctx, banco.Feminino, "2025-03-01"); !errors.Is(err, acervo.ErrNaoEncontrado) {
 		t.Fatalf("partida masculina não deveria aparecer no feminino: %v", err)
+	}
+
+	f, err := ac.Partida(ctx, banco.Feminino, "2025-05-05")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var minutos []string
+	for _, g := range f.Gols {
+		minutos = append(minutos, g.Minuto)
+	}
+	if strings.Join(minutos, " ") != "5 15 90+1" {
+		t.Errorf("gols deveriam vir por minuto, vieram %v", minutos)
+	}
+	if f, _ := ac.Partida(ctx, banco.Feminino, "2026-12-01"); f.Mando != "neutro" {
+		t.Errorf("Libertadores Feminina é em sede única, mando deveria ser neutro: %q", f.Mando)
 	}
 }
 

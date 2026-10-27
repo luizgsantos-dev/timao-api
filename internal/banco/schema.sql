@@ -18,8 +18,9 @@ CREATE TABLE fonte (
 CREATE TABLE pessoa (
     id            INTEGER PRIMARY KEY,
     wikidata      TEXT UNIQUE,      -- ex.: Q312937
-    nome          TEXT NOT NULL,
-    nome_busca    TEXT NOT NULL,    -- nome sem acentos e em minúsculas, para busca
+    nome          TEXT NOT NULL,    -- nome de uso: o título do artigo na Wikipédia em inglês, quando há
+    nome_completo TEXT,             -- o rótulo do Wikidata, quando difere do nome de uso
+    nome_busca    TEXT NOT NULL,    -- nome e nome completo sem acentos e em minúsculas, para busca
     genero        TEXT CHECK (genero IN ('masculino', 'feminino')),
     nascimento    TEXT,             -- AAAA, AAAA-MM ou AAAA-MM-DD, conforme a precisão da fonte
     falecimento   TEXT,
@@ -89,7 +90,7 @@ CREATE TABLE partida (
     fase            TEXT,
     adversario      TEXT NOT NULL,
     adversario_busca TEXT NOT NULL, -- idem, para busca
-    mando           TEXT NOT NULL CHECK (mando IN ('casa', 'fora')), -- casa = Corinthians listado como mandante
+    mando           TEXT NOT NULL CHECK (mando IN ('casa', 'fora', 'neutro')), -- casa = Corinthians listado como mandante; neutro = competição em sede única
     gols_pro        INTEGER,        -- nulo quando o jogo ainda não aconteceu
     gols_contra     INTEGER,
     penaltis_pro    INTEGER,

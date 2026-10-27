@@ -103,3 +103,19 @@ func TestExtrairMundial(t *testing.T) {
 		t.Errorf("final nos pênaltis: %+v", p)
 	}
 }
+
+func TestNomeDoTime(t *testing.T) {
+	casos := map[string]string{
+		"CR Flamengo":                    "Flamengo",
+		"Flamengo RJ":                    "Flamengo",
+		"CA Mineiro":                     "Atlético Mineiro",
+		"América MG":                     "América Mineiro",
+		"Boca Juniors (ARG)":             "Boca Juniors",
+		"CR Vasco da Gama   [postponed]": "Vasco da Gama",
+	}
+	for in, want := range casos {
+		if got := nomeDoTime(in); got != want {
+			t.Errorf("nomeDoTime(%q) = %q, esperava %q", in, got, want)
+		}
+	}
+}

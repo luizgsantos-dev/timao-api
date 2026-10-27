@@ -20,7 +20,7 @@ import (
 var schema string
 
 // VersaoEsquema muda sempre que schema.sql mudar de forma incompatível.
-const VersaoEsquema = "5"
+const VersaoEsquema = "6"
 
 const (
 	Masculino = "masculino"
@@ -179,12 +179,21 @@ func (e *Escritor) Fonte(ctx context.Context, f Fonte) (int64, error) {
 	return res.LastInsertId()
 }
 
+// Pessoa grava uma pessoa. O nome gravado é o de uso, tirado do título do artigo
+// na Wikipédia em inglês ("Dida", e não "Nelson de Jesus Silva"), que é o mesmo
+// que as páginas de temporada usam nos gols; o nome recebido, quando difere, fica
+// como nome completo.
 func (e *Escritor) Pessoa(ctx context.Context, p Pessoa, fonteID int64) (int64, error) {
+	nome, completo := p.Nome, ""
+	if uso := NomeDeUso(p.WikiEN); uso != "" && uso != p.Nome {
+		nome, completo = uso, p.Nome
+	}
 	res, err := e.tx.ExecContext(ctx, `
-		INSERT INTO pessoa (wikidata, nome, nome_busca, genero, nascimento, falecimento, nacionalidade,
+		INSERT INTO pessoa (wikidata, nome, nome_completo, nome_busca, genero, nascimento, falecimento, nacionalidade,
 		                    posicao, foto_url, wiki_pt, wiki_en, fonte_id)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		nulo(p.Wikidata), p.Nome, Normalizar(p.Nome), nulo(p.Genero), nulo(p.Nascimento), nulo(p.Falecimento),
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		nulo(p.Wikidata), nome, nulo(completo), Normalizar(strings.TrimSpace(nome+" "+completo)), nulo(p.Genero),
+		nulo(p.Nascimento), nulo(p.Falecimento),
 		nulo(p.Nacionalidade), nulo(p.Posicao), nulo(p.FotoURL), nulo(p.WikiPT), nulo(p.WikiEN), fonteID)
 	if err != nil {
 		return 0, fmt.Errorf("banco: pessoa %s: %w", p.Wikidata, err)
@@ -242,7 +251,15 @@ func (e *Escritor) Elenco(ctx context.Context, el Elenco, pessoaID, fonteID int6
 
 // Partida grava a partida e seus gols. Se já existe uma partida da mesma categoria,
 // data e adversário (a mesma página às vezes repete o jogo), devolve false e não grava.
+// Partida grava uma partida e seus gols. O nome do adversário passa pela tabela
+// de nomes (NomeDoAdversario) e, nas competições disputadas em sede única, o mando
+// vira "neutro". Se já existe partida da categoria com o mesmo adversário no mesmo
+// dia, devolve false e não grava.
 func (e *Escritor) Partida(ctx context.Context, p Partida, fonteID int64) (bool, error) {
+	p.Adversario = NomeDoAdversario(p.Adversario)
+	if SedeUnica(p.Categoria, p.Competicao) {
+		p.Mando = "neutro"
+	}
 	res, err := e.tx.ExecContext(ctx, `
 		INSERT INTO partida (categoria, temporada, data, horario, competicao, fase, adversario, adversario_busca, mando,
 		                     gols_pro, gols_contra, penaltis_pro, penaltis_contra,
@@ -379,6 +396,102 @@ func palavrasDistintivas(nome string) map[string]bool {
 		}
 	}
 	return out
+}
+
+// AjustarPassagensPelosGols recua o início das passagens de jogadores e jogadoras
+// deduzidas das páginas da Wikipédia (elencos e categorias) até a primeira
+// temporada em que a pessoa marcou pelo clube. Essas passagens nascem da primeira
+// temporada com elenco publicado, e as páginas de competição trazem gols de anos
+// sem elenco. Passagens do Wikidata, que têm datas próprias, não mudam. Devolve
+// quantas passagens mudaram.
+func (e *Escritor) AjustarPassagensPelosGols(ctx context.Context) (int64, error) {
+	res, err := e.tx.ExecContext(ctx, `
+		WITH primeiro_gol AS (
+			SELECT pe.id AS pessoa_id, p.categoria, min(p.temporada) AS temporada
+			FROM gol g JOIN partida p ON p.id = g.partida_id JOIN pessoa pe ON pe.wiki_en = g.autor_wiki_en
+			WHERE g.lado = 'pro' AND g.tipo <> 'contra'
+			GROUP BY pe.id, p.categoria
+		)
+		UPDATE passagem SET inicio = (
+			SELECT CAST(pg.temporada AS TEXT) FROM primeiro_gol pg
+			WHERE pg.pessoa_id = passagem.pessoa_id AND pg.categoria = passagem.categoria)
+		WHERE funcao = 'jogador' AND length(inicio) = 4
+		  AND fonte_id IN (SELECT id FROM fonte WHERE nome LIKE 'Wikipédia%')
+		  AND (SELECT pg.temporada FROM primeiro_gol pg
+		       WHERE pg.pessoa_id = passagem.pessoa_id AND pg.categoria = passagem.categoria) < CAST(inicio AS INTEGER)`)
+	if err != nil {
+		return 0, fmt.Errorf("banco: ajustando passagens pelos gols: %w", err)
+	}
+	return res.RowsAffected()
+}
+
+// NomeDeUso tira do título de um artigo da Wikipédia em inglês a desambiguação
+// entre parênteses: "Dida (footballer, born 1973)" vira "Dida".
+func NomeDeUso(tituloWikiEN string) string {
+	if i := strings.Index(tituloWikiEN, " ("); i > 0 {
+		tituloWikiEN = tituloWikiEN[:i]
+	}
+	return strings.TrimSpace(tituloWikiEN)
+}
+
+// Nomes de adversário que as fontes abreviam ou grafam de outro jeito -> o nome
+// usado no resto do banco. Só abreviações, siglas de estado e erros de grafia:
+// nomes históricos de verdade (Atlético Paranaense até 2018, Athletico depois;
+// Bragantino antes de 2020) ficam como a fonte escreveu. Nomes iguais que podem
+// ser de clubes diferentes ("Comercial", "América", "SC Internacional", o paulista
+// de 1913) também ficam.
+var nomesDeAdversario = map[string]string{
+	"Atlético-PR":                 "Atlético Paranaense",
+	"Atlético-MG":                 "Atlético Mineiro",
+	"Atlético-GO":                 "Atlético Goianiense",
+	"Atlético Goianense":          "Atlético Goianiense",
+	"América-MG":                  "América Mineiro",
+	"Sport":                       "Sport Recife",
+	"Sport-PE":                    "Sport Recife",
+	"Grêmio FBPA":                 "Grêmio",
+	"Internacional-RS":            "Internacional",
+	"Sao Paulo":                   "São Paulo",
+	"Botafogo-RJ":                 "Botafogo",
+	"Botafogo -SP":                "Botafogo-SP",
+	"Botafogo (SP)":               "Botafogo-SP",
+	"Fortaleza-CE":                "Fortaleza",
+	"Goiás-GO":                    "Goiás",
+	"Vila Nova-GO":                "Vila Nova",
+	"São Caetano-SP":              "São Caetano",
+	"ABC-RN":                      "ABC",
+	"Juventus-SP":                 "Juventus",
+	"Port. Santista":              "Portuguesa Santista",
+	"Portuguesa Sa":               "Portuguesa Santista",
+	"Mogi-Mirim":                  "Mogi Mirim",
+	"Aracatuba":                   "Araçatuba",
+	"Ferroviaria":                 "Ferroviária",
+	"XV de Novembro (Jaú)":        "XV de Jaú",
+	"XV de Novembro (Piracicaba)": "XV de Piracicaba",
+	"Paulista (JUN)":              "Paulista",
+	"Paulista (Jundiaí)":          "Paulista",
+	"União S. João":               "União São João",
+	"Avaí Kindermann":             "Avaí/Kindermann",
+	"Kindermann/Avaí":             "Avaí/Kindermann",
+}
+
+// NomeDoAdversario devolve o nome do adversário como o banco o grava.
+func NomeDoAdversario(nome string) string {
+	if n, ok := nomesDeAdversario[strings.TrimSpace(nome)]; ok {
+		return n
+	}
+	return strings.TrimSpace(nome)
+}
+
+// Competições disputadas inteiras numa sede, por categoria: nelas ninguém joga
+// em casa, ainda que a fonte liste um mandante.
+var competicoesEmSedeUnica = map[string]map[string]bool{
+	Masculino: {"Mundial de Clubes da FIFA": true},
+	Feminino:  {"Copa Libertadores": true, "Copa dos Campeões Feminina da FIFA": true},
+}
+
+// SedeUnica diz se a competição, na categoria, é disputada em sede única.
+func SedeUnica(categoria, competicao string) bool {
+	return competicoesEmSedeUnica[categoria][competicao]
 }
 
 // Abrir abre um timao.db existente só para leitura.

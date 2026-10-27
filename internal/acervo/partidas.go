@@ -128,9 +128,15 @@ func (a *Acervo) Partida(ctx context.Context, categoria, data string) (Partida, 
 		return p, erroConsulta("lendo partida", err)
 	}
 
-	rows, err := a.conn().QueryContext(ctx, `SELECT g.minuto, g.autor, g.tipo, g.lado,
+	// Os gols saem em ordem de minuto ("90+3" depois de "90", sem minuto no fim),
+	// e não na ordem da fonte, que costuma listar os de cada time separados.
+	rows, err := a.conn().QueryContext(ctx, `SELECT g.minuto,
+		COALESCE((SELECT pe.nome FROM pessoa pe WHERE pe.wiki_en = g.autor_wiki_en LIMIT 1), g.autor), g.tipo, g.lado,
 		(SELECT pe.wikidata FROM pessoa pe WHERE pe.wiki_en = g.autor_wiki_en LIMIT 1)
-		FROM gol g WHERE g.partida_id = ? ORDER BY g.id`, p.id)
+		FROM gol g WHERE g.partida_id = ?
+		ORDER BY g.minuto IS NULL, CAST(g.minuto AS INTEGER),
+		         CASE WHEN instr(g.minuto, '+') > 0 THEN CAST(substr(g.minuto, instr(g.minuto, '+') + 1) AS INTEGER) ELSE 0 END,
+		         g.id`, p.id)
 	if err != nil {
 		return p, erroConsulta("listando gols", err)
 	}
