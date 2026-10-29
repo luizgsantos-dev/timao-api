@@ -91,6 +91,16 @@ Busca dirigida a fontes oficiais, primeiro nacionais, depois internacionais e po
 | Gols do Brasileirão de 2014 | Súmulas da Série A (CBF), se autorizado |
 | Datas da Copa do Brasil 1989–1999 | Hemeroteca (manual) |
 
+## Atualização: APIs esportivas com plano grátis (29/10/2026)
+
+Conferência de uma lista de APIs sugeridas (API Futebol, API-Sports, TheSportsDB, "Corinthians API" do Parse.bot, Sofascore). Nenhuma fecha as lacunas (Brabas 2016–2021, gols antigos).
+
+- **TheSportsDB** (testada com a chave pública 123): tem o masculino (134284) e as Brabas (143590, liga "Brazil Brasileiro Women", 5201), mas a liga feminina só tem temporadas de 2022 a 2026, que a Wikipédia já cobre por completo, e a chave grátis devolve no máximo 15 jogos por temporada. Os termos do plano grátis permitem uso em projetos em desenvolvimento; publicar exige assinatura (US$ 9/mês) e crédito à TheSportsDB. Ponto a favor: o resultado mais recente das Brabas (28/10/2026, 2 x 1 Santa Fe) já estava lá, antes da Wikipédia.
+- **API-Sports / API-Football:** plano grátis com 100 requisições por dia e cadastro obrigatório; os termos proíbem revender ou repassar os dados, o que conflita com gravar no timao.db e servir pela API. A cobertura do feminino brasileiro antes de 2022 só dá para conferir com uma conta.
+- **API Futebol:** paga (a partir de R$ 99/mês por campeonato).
+- **Parse.bot, "Corinthians API":** não encontrada. Se existir como descrita, extrai do site oficial, que tem todos os direitos reservados; o problema de licença seria o mesmo do site.
+- **Sofascore:** já descartada; os termos proíbem coleta.
+
 ## Descartadas
 
 - **ogol, Transfermarkt, Sofascore:** os termos de uso proíbem coleta automática.
